@@ -170,9 +170,6 @@ CLASS zcl_zip_diff_viewer IMPLEMENTATION.
       tree_file_links = VALUE #( BASE tree_file_links
         ( node_key  = <gs_tree>-node_key
           diff_item = diff_item ) ).
-*          diff_state = diff_item->diff_state
-*          file_path  = path && diff_item->local_name ) ).
-
 
       IF diff_item->folder_diff IS BOUND.
         IF lines( diff_item->folder_diff->items ) > 0.
@@ -196,70 +193,7 @@ CLASS zcl_zip_diff_viewer IMPLEMENTATION.
     ASSERT sy-subrc = 0.
 
     RAISE EVENT selection_changed EXPORTING node = <tree_file_link>-diff_item->*.
-*    DATA: content      TYPE xstring,
-*          solix_tab    TYPE solix_tab,
-*          xml_document TYPE REF TO if_ixml_document.
-*
-*    ASSIGN tree_file_links[ node_key = node_key ] TO FIELD-SYMBOL(<tree_file_link>).
-*    IF <tree_file_link>-diff_state = STATE-changed.
-*
-*      zip_1->get(
-*        EXPORTING
-*          name                    = <tree_file_link>-file_path
-*        IMPORTING
-*          content                 = content
-*        EXCEPTIONS
-*          zip_index_error         = 1
-*          zip_decompression_error = 2
-*          OTHERS                  = 3 ).
-*      IF sy-subrc <> 0.
-**        MESSAGE ID sy-msgid TYPE sy-msgty NUMBER sy-msgno
-**                   WITH sy-msgv1 sy-msgv2 sy-msgv3 sy-msgv4.
-*      ENDIF.
-*      SPLIT <tree_file_link>-file_path AT '/' INTO TABLE DATA(parts).
-*      DATA(new_parts) = VALUE string_table( ).
-*      LOOP AT parts REFERENCE INTO DATA(part).
-*        INSERT part->* INTO new_parts INDEX 1.
-*      ENDLOOP.
-*      DATA(file_old) = temp_dir && '\old_' && concat_lines_of( table = new_parts sep = '_' ) && '.xml'.
-*      IF <tree_file_link>-file_path CS '.xml'.
-*        xml_pretty_print( CHANGING c_content = content ).
-*      ENDIF.
-*      gui_download(
-*            i_content   = content
-*            i_file_path = file_old ).
-*
-*      zip_new->get(
-*        EXPORTING
-*          name                    = <tree_file_link>-file_path
-*        IMPORTING
-*          content                 = content
-*        EXCEPTIONS
-*          zip_index_error         = 1
-*          zip_decompression_error = 2
-*          OTHERS                  = 3 ).
-*      IF sy-subrc <> 0.
-**        MESSAGE ID sy-msgid TYPE sy-msgty NUMBER sy-msgno
-**                   WITH sy-msgv1 sy-msgv2 sy-msgv3 sy-msgv4.
-*      ENDIF.
-*      DATA(file_new) = temp_dir && '\new_' && concat_lines_of( table = new_parts sep = '_' ) && '.xml'.
-*      IF <tree_file_link>-file_path CS '.xml'.
-*        xml_pretty_print( CHANGING c_content = content ).
-*      ENDIF.
-*      gui_download(
-*            i_content   = content
-*            i_file_path = file_new ).
-*
-**      cl_gui_frontend_services=>execute( document = file_new ).
-*      cl_gui_frontend_services=>execute(
-*            application = 'code'
-*            parameter   = |-d "{ file_old }" "{ file_new }"|
-*            minimized   = 'X'
-*            synchronous = '' ).
-*
-*    ENDIF.
-*
-*
+
   ENDMETHOD.
 
 
