@@ -88,8 +88,8 @@ CLASS zcl_zip_diff_item IMPLEMENTATION.
 
     DATA: diff_item   TYPE ty_diff_item,
           folder_diff TYPE REF TO zcl_zip_diff_item,
-          item_1 TYPE REF TO zcl_zip_diff_item=>ty_item,
-          item_2 TYPE REF TO zcl_zip_diff_item=>ty_item.
+          item_1      TYPE REF TO zcl_zip_diff_item=>ty_item,
+          item_2      TYPE REF TO zcl_zip_diff_item=>ty_item.
 
     result = NEW zcl_zip_diff_item( ).
     result->path = path.
@@ -156,9 +156,17 @@ CLASS zcl_zip_diff_item IMPLEMENTATION.
       ELSEIF zip_1_index <= lines( zip_1_items ).
         diff_state = state-deleted.
         zip_1_read = abap_true.
+        IF contains( val = item_1->local_name end = '/' ).
+          " folder
+          folder_diff = compare_items_at_path( path = |{ path }{ item_1->local_name }| ).
+        ENDIF.
       ELSEIF zip_2_index <= lines( zip_2_items ).
         diff_state = state-added.
         zip_2_read = abap_true.
+        IF contains( val = item_2->local_name end = '/' ).
+          " folder
+          folder_diff = compare_items_at_path( path = |{ path }{ item_2->local_name }| ).
+        ENDIF.
       ELSE.
         " no more file to compare
         EXIT.
@@ -241,13 +249,13 @@ CLASS zcl_zip_diff_item IMPLEMENTATION.
       IF local_name IS NOT INITIAL.
         IF NOT line_exists( path_items[ local_name = local_name ] ).
           INSERT COND ty_item(
-                when not contains( val = local_name end = '/' ) then value #(
+                WHEN NOT contains( val = local_name end = '/' ) THEN VALUE #(
                   local_name = local_name
                   full_path  = <item>-name
                   date       = <item>-date
                   time       = <item>-time
                   size       = <item>-size )
-                else value #(
+                ELSE VALUE #(
                   local_name = local_name
                   full_path  = path && local_name ) )
               INTO TABLE path_items.
