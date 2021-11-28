@@ -103,31 +103,6 @@ CLASS lcl_app IMPLEMENTATION.
 
       WHEN 1000.
 
-        CALL FUNCTION 'RS_REFRESH_FROM_SELECTOPTIONS'
-          EXPORTING
-            curr_report         = sy-repid
-          TABLES
-            selection_table     = lt_dummy
-            selection_table_255 = lt_sel_255
-          EXCEPTIONS
-            not_found           = 1
-            no_report           = 2
-            OTHERS              = 3.
-
-        CASE abap_true.
-          WHEN sel( it_sel = lt_sel_255 selname = 'R_PROGID' ).
-
-            LOOP AT SCREEN INTO ls_screen.
-              CASE ls_screen-group1.
-                WHEN 'MIM'.
-                  ls_screen-active = '1'.
-                  MODIFY SCREEN FROM ls_screen.
-                WHEN 'CMP'.
-                  ls_screen-active = '0'.
-                  MODIFY SCREEN FROM ls_screen.
-              ENDCASE.
-            ENDLOOP.
-
             DATA(lt_value) = VALUE vrm_values(
                 ( key = 'excel.sheet'      text = 'MS Excel' )
                 ( key = 'word.document'    text = 'MS Word' )
@@ -143,7 +118,36 @@ CLASS lcl_app IMPLEMENTATION.
 
             ASSIGN ('P_PROGID') TO FIELD-SYMBOL(<progid>).
             ASSERT sy-subrc = 0.
+            if NOT line_exists( LT_VALUE[ key = <progid> ] ).
             <progid> = lt_value[ 1 ]-key.
+            endif.
+
+        CALL FUNCTION 'RS_REFRESH_FROM_SELECTOPTIONS'
+          EXPORTING
+            curr_report         = sy-repid
+          TABLES
+            selection_table     = lt_dummy
+            selection_table_255 = lt_sel_255
+          EXCEPTIONS
+            not_found           = 1
+            no_report           = 2
+            OTHERS              = 3.
+
+          if abap_false = sel( it_sel = lt_sel_255 selname = 'R_COMPA2' ).
+
+        CASE abap_true.
+          WHEN sel( it_sel = lt_sel_255 selname = 'R_PROGID' ).
+
+            LOOP AT SCREEN INTO ls_screen.
+              CASE ls_screen-group1.
+                WHEN 'MIM'.
+                  ls_screen-active = '1'.
+                  MODIFY SCREEN FROM ls_screen.
+                WHEN 'CMP'.
+                  ls_screen-active = '0'.
+                  MODIFY SCREEN FROM ls_screen.
+              ENDCASE.
+            ENDLOOP.
 
           WHEN OTHERS.
 
@@ -159,6 +163,8 @@ CLASS lcl_app IMPLEMENTATION.
             ENDLOOP.
 
         ENDCASE.
+
+        ENDIF.
 
       WHEN 1001.
 
@@ -182,6 +188,31 @@ CLASS lcl_app IMPLEMENTATION.
           IF sy-subrc <> 0.
             " Error handling
           ENDIF.
+
+          if abap_true = sel( it_sel = lt_sel_255 selname = 'R_COMPA2' ).
+
+FIELD-SYMBOLS <xstring> type xstring.
+assign ('P_XZIP_1') TO <xstring>.
+
+              CREATE OBJECT zip_old.
+              CALL METHOD zip_old->load
+                EXPORTING
+                  zip             = <xstring>
+                EXCEPTIONS
+                  zip_parse_error = 1
+                  OTHERS          = 2.
+
+assign ('P_XZIP_2') TO <xstring>.
+
+              CREATE OBJECT zip_new.
+              CALL METHOD zip_new->load
+                EXPORTING
+                  zip             = <xstring>
+                EXCEPTIONS
+                  zip_parse_error = 1
+                  OTHERS          = 2.
+
+              else.
 
           CASE abap_true.
             WHEN sel( it_sel = lt_sel_255 selname = 'R_PROGID' ).
@@ -223,6 +254,7 @@ CLASS lcl_app IMPLEMENTATION.
                   p_exclude = lt_itab.
 
               xdata = load_binary_file( path = sel( it_sel = lt_sel_255 selname = 'P_ZIP_1' ) ).
+
               CREATE OBJECT zip_old.
               CALL METHOD zip_old->load
                 EXPORTING
@@ -251,6 +283,8 @@ CLASS lcl_app IMPLEMENTATION.
 *                retcode      = retcode ).
 *            APPEND error TO t_errors.
           ENDCASE.
+
+              endif.
 
           viewer = NEW zcl_zip_diff_viewer2( io_container = go_container_right ).
           SET HANDLER on_selection_changed FOR viewer.
@@ -637,6 +671,9 @@ PARAMETERS p_progid TYPE c LENGTH 60 LOWER CASE AS LISTBOX VISIBLE LENGTH 60 MOD
 PARAMETERS r_compar RADIOBUTTON GROUP rb1.
 PARAMETERS p_zip_1  TYPE string LOWER CASE MODIF ID cmp.
 PARAMETERS p_zip_2  TYPE string LOWER CASE MODIF ID cmp.
+PARAMETERS r_compa2 NO-display.
+PARAMETERS p_xzip_1 TYPE xstring NO-display.
+PARAMETERS p_xzip_2 TYPE xstring NO-display.
 
 SELECTION-SCREEN BEGIN OF SCREEN 1001.
 SELECTION-SCREEN FUNCTION KEY 1.
