@@ -35,27 +35,34 @@ CLASS lcl_app DEFINITION.
         container     TYPE REF TO cl_gui_container
       RETURNING
         VALUE(result) TYPE REF TO i_oi_document_proxy.
+
     METHODS get_document
       RETURNING
         VALUE(result) TYPE xstring.
+
     METHODS get_last_and_previous_zip
       EXPORTING
         eo_zip_old TYPE REF TO cl_abap_zip
         eo_zip     TYPE REF TO cl_abap_zip.
+
     METHODS gui_download
       IMPORTING
         i_content   TYPE xstring
         i_file_path TYPE string.
+
     METHODS xml_pretty_print
       CHANGING
         c_content TYPE xstring.
+
     TYPES ty_table_sel TYPE STANDARD TABLE OF rsparamsl_255 WITH DEFAULT KEY.
+
     METHODS sel
       IMPORTING
         it_sel        TYPE ty_table_sel
         selname       TYPE rsparamsl_255-selname
       RETURNING
         VALUE(result) TYPE string.
+
     METHODS on_selection_changed
                   FOR EVENT selection_changed OF zcl_zip_diff_viewer2
       IMPORTING node.
@@ -96,31 +103,29 @@ CLASS lcl_app IMPLEMENTATION.
     DATA: lt_dummy  TYPE TABLE OF rsparams,
           ls_screen TYPE screen,
           lt_itab   TYPE ui_functions.
-*    DATA: lo_zip_old TYPE REF TO cl_abap_zip,
-*          lo_zip     TYPE REF TO cl_abap_zip.
 
     CASE sy-dynnr.
 
       WHEN 1000.
 
-            DATA(lt_value) = VALUE vrm_values(
-                ( key = 'excel.sheet'      text = 'MS Excel' )
-                ( key = 'word.document'    text = 'MS Word' )
-                ( key = 'powerpoint.slide' text = 'MS Powerpoint' ) ).
+        DATA(lt_value) = VALUE vrm_values(
+            ( key = 'excel.sheet'      text = 'MS Excel' )
+            ( key = 'word.document'    text = 'MS Word' )
+            ( key = 'powerpoint.slide' text = 'MS Powerpoint' ) ).
 
-            CALL FUNCTION 'VRM_SET_VALUES'
-              EXPORTING
-                id              = 'P_PROGID'
-                values          = lt_value
-              EXCEPTIONS
-                id_illegal_name = 1
-                OTHERS          = 2.
+        CALL FUNCTION 'VRM_SET_VALUES'
+          EXPORTING
+            id              = 'P_PROGID'
+            values          = lt_value
+          EXCEPTIONS
+            id_illegal_name = 1
+            OTHERS          = 2.
 
-            ASSIGN ('P_PROGID') TO FIELD-SYMBOL(<progid>).
-            ASSERT sy-subrc = 0.
-            if NOT line_exists( LT_VALUE[ key = <progid> ] ).
-            <progid> = lt_value[ 1 ]-key.
-            endif.
+        ASSIGN ('P_PROGID') TO FIELD-SYMBOL(<progid>).
+        ASSERT sy-subrc = 0.
+        IF NOT line_exists( lt_value[ key = <progid> ] ).
+          <progid> = lt_value[ 1 ]-key.
+        ENDIF.
 
         CALL FUNCTION 'RS_REFRESH_FROM_SELECTOPTIONS'
           EXPORTING
@@ -133,36 +138,36 @@ CLASS lcl_app IMPLEMENTATION.
             no_report           = 2
             OTHERS              = 3.
 
-          if abap_false = sel( it_sel = lt_sel_255 selname = 'R_COMPA2' ).
+        IF abap_false = sel( it_sel = lt_sel_255 selname = 'R_COMPA2' ).
 
-        CASE abap_true.
-          WHEN sel( it_sel = lt_sel_255 selname = 'R_PROGID' ).
+          CASE abap_true.
+            WHEN sel( it_sel = lt_sel_255 selname = 'R_PROGID' ).
 
-            LOOP AT SCREEN INTO ls_screen.
-              CASE ls_screen-group1.
-                WHEN 'MIM'.
-                  ls_screen-active = '1'.
-                  MODIFY SCREEN FROM ls_screen.
-                WHEN 'CMP'.
-                  ls_screen-active = '0'.
-                  MODIFY SCREEN FROM ls_screen.
-              ENDCASE.
-            ENDLOOP.
+              LOOP AT SCREEN INTO ls_screen.
+                CASE ls_screen-group1.
+                  WHEN 'MIM'.
+                    ls_screen-active = '1'.
+                    MODIFY SCREEN FROM ls_screen.
+                  WHEN 'CMP'.
+                    ls_screen-active = '0'.
+                    MODIFY SCREEN FROM ls_screen.
+                ENDCASE.
+              ENDLOOP.
 
-          WHEN OTHERS.
+            WHEN OTHERS.
 
-            LOOP AT SCREEN INTO ls_screen.
-              CASE ls_screen-group1.
-                WHEN 'MIM'.
-                  ls_screen-active = '0'.
-                  MODIFY SCREEN FROM ls_screen.
-                WHEN 'CMP'.
-                  ls_screen-active = '1'.
-                  MODIFY SCREEN FROM ls_screen.
-              ENDCASE.
-            ENDLOOP.
+              LOOP AT SCREEN INTO ls_screen.
+                CASE ls_screen-group1.
+                  WHEN 'MIM'.
+                    ls_screen-active = '0'.
+                    MODIFY SCREEN FROM ls_screen.
+                  WHEN 'CMP'.
+                    ls_screen-active = '1'.
+                    MODIFY SCREEN FROM ls_screen.
+                ENDCASE.
+              ENDLOOP.
 
-        ENDCASE.
+          ENDCASE.
 
         ENDIF.
 
@@ -189,109 +194,99 @@ CLASS lcl_app IMPLEMENTATION.
             " Error handling
           ENDIF.
 
-          if abap_true = sel( it_sel = lt_sel_255 selname = 'R_COMPA2' ).
+          IF abap_true = sel( it_sel = lt_sel_255 selname = 'R_COMPA2' ).
 
-FIELD-SYMBOLS <xstring> type xstring.
-assign ('P_XZIP_1') TO <xstring>.
+            FIELD-SYMBOLS <xstring> TYPE xstring.
+            ASSIGN ('P_XZIP_1') TO <xstring>.
 
-              CREATE OBJECT zip_old.
-              CALL METHOD zip_old->load
-                EXPORTING
-                  zip             = <xstring>
-                EXCEPTIONS
-                  zip_parse_error = 1
-                  OTHERS          = 2.
+            CREATE OBJECT zip_old.
+            CALL METHOD zip_old->load
+              EXPORTING
+                zip             = <xstring>
+              EXCEPTIONS
+                zip_parse_error = 1
+                OTHERS          = 2.
 
-assign ('P_XZIP_2') TO <xstring>.
+            ASSIGN ('P_XZIP_2') TO <xstring>.
 
-              CREATE OBJECT zip_new.
-              CALL METHOD zip_new->load
-                EXPORTING
-                  zip             = <xstring>
-                EXCEPTIONS
-                  zip_parse_error = 1
-                  OTHERS          = 2.
+            CREATE OBJECT zip_new.
+            CALL METHOD zip_new->load
+              EXPORTING
+                zip             = <xstring>
+              EXCEPTIONS
+                zip_parse_error = 1
+                OTHERS          = 2.
 
-              else.
+          ELSE.
 
-          CASE abap_true.
-            WHEN sel( it_sel = lt_sel_255 selname = 'R_PROGID' ).
+            CASE abap_true.
+              WHEN sel( it_sel = lt_sel_255 selname = 'R_PROGID' ).
 
-              lt_itab = VALUE ui_functions( ( 'ONLI' ) ).
-              CALL FUNCTION 'RS_SET_SELSCREEN_STATUS'
-                EXPORTING
-                  p_status  = sy-pfkey
-                TABLES
-                  p_exclude = lt_itab.
+                lt_itab = VALUE ui_functions( ( 'ONLI' ) ).
+                CALL FUNCTION 'RS_SET_SELSCREEN_STATUS'
+                  EXPORTING
+                    p_status  = sy-pfkey
+                  TABLES
+                    p_exclude = lt_itab.
 
-              go_document = display_document( go_container_left ).
-              go_document->create_document(
-                EXPORTING
-                  open_inplace = abap_true
-                IMPORTING
-                  error        = error
-                  retcode      = retcode ).
-              APPEND error TO t_errors.
-              xdata = get_document( ).
+                go_document = display_document( go_container_left ).
+                go_document->create_document(
+                  EXPORTING
+                    open_inplace = abap_true
+                  IMPORTING
+                    error        = error
+                    retcode      = retcode ).
+                APPEND error TO t_errors.
+                xdata = get_document( ).
 
-              CREATE OBJECT zip_new.
-              CALL METHOD zip_new->load
-                EXPORTING
-                  zip             = xdata
-                EXCEPTIONS
-                  zip_parse_error = 1
-                  OTHERS          = 2.
+                CREATE OBJECT zip_new.
+                CALL METHOD zip_new->load
+                  EXPORTING
+                    zip             = xdata
+                  EXCEPTIONS
+                    zip_parse_error = 1
+                    OTHERS          = 2.
 
-              zip_old = zip_new.
+                zip_old = zip_new.
 
-            WHEN OTHERS.
+              WHEN OTHERS.
 
-              lt_itab = VALUE ui_functions( ( 'ONLI' ) ( 'FC01' ) ).
-              CALL FUNCTION 'RS_SET_SELSCREEN_STATUS'
-                EXPORTING
-                  p_status  = sy-pfkey
-                TABLES
-                  p_exclude = lt_itab.
+                lt_itab = VALUE ui_functions( ( 'ONLI' ) ( 'FC01' ) ).
+                CALL FUNCTION 'RS_SET_SELSCREEN_STATUS'
+                  EXPORTING
+                    p_status  = sy-pfkey
+                  TABLES
+                    p_exclude = lt_itab.
 
-              xdata = load_binary_file( path = sel( it_sel = lt_sel_255 selname = 'P_ZIP_1' ) ).
+                xdata = load_binary_file( path = sel( it_sel = lt_sel_255 selname = 'P_ZIP_1' ) ).
 
-              CREATE OBJECT zip_old.
-              CALL METHOD zip_old->load
-                EXPORTING
-                  zip             = xdata
-                EXCEPTIONS
-                  zip_parse_error = 1
-                  OTHERS          = 2.
+                CREATE OBJECT zip_old.
+                CALL METHOD zip_old->load
+                  EXPORTING
+                    zip             = xdata
+                  EXCEPTIONS
+                    zip_parse_error = 1
+                    OTHERS          = 2.
 
-              xdata = load_binary_file( path = sel( it_sel = lt_sel_255 selname = 'P_ZIP_2' ) ).
-              CREATE OBJECT zip_new.
-              CALL METHOD zip_new->load
-                EXPORTING
-                  zip             = xdata
-                EXCEPTIONS
-                  zip_parse_error = 1
-                  OTHERS          = 2.
+                xdata = load_binary_file( path = sel( it_sel = lt_sel_255 selname = 'P_ZIP_2' ) ).
+                CREATE OBJECT zip_new.
+                CALL METHOD zip_new->load
+                  EXPORTING
+                    zip             = xdata
+                  EXCEPTIONS
+                    zip_parse_error = 1
+                    OTHERS          = 2.
 
-*            DATA(solix_tab) = cl_bcs_convert=>xstring_to_solix( xdata ).
-*            go_document->open_document_from_table(
-*              EXPORTING
-*                document_size    = xstrlen( xdata )
-*                document_table   = solix_tab
-*                open_inplace     = abap_true
-*              IMPORTING
-*                error        = error
-*                retcode      = retcode ).
-*            APPEND error TO t_errors.
-          ENDCASE.
+            ENDCASE.
 
-              endif.
+          ENDIF.
 
           viewer = NEW zcl_zip_diff_viewer2( io_container = go_container_right ).
           SET HANDLER on_selection_changed FOR viewer.
 
           viewer->diff_and_view(
-              zip_1 = zip_old
-              zip_2 = zip_new ).
+              zip_old = zip_old
+              zip_new = zip_new ).
 
         ENDIF.
 
@@ -338,8 +333,8 @@ assign ('P_XZIP_2') TO <xstring>.
                     eo_zip     = zip_new ).
 
               viewer->diff_and_view(
-                  zip_1 = zip_old
-                  zip_2 = zip_new ).
+                  zip_old = zip_old
+                  zip_new = zip_new ).
 
             ENDIF.
 
@@ -358,9 +353,7 @@ assign ('P_XZIP_2') TO <xstring>.
 
         go_splitter_container->free( ).
         FREE: go_splitter_container, go_container_left, go_container_right, go_document, viewer.
-*            CLEAR sscrfields->ucomm.
         LEAVE TO SCREEN 0.
-*LEAVE TO SCREEN 1000.
 
     ENDCASE.
 
@@ -671,9 +664,9 @@ PARAMETERS p_progid TYPE c LENGTH 60 LOWER CASE AS LISTBOX VISIBLE LENGTH 60 MOD
 PARAMETERS r_compar RADIOBUTTON GROUP rb1.
 PARAMETERS p_zip_1  TYPE string LOWER CASE MODIF ID cmp.
 PARAMETERS p_zip_2  TYPE string LOWER CASE MODIF ID cmp.
-PARAMETERS r_compa2 NO-display.
-PARAMETERS p_xzip_1 TYPE xstring NO-display.
-PARAMETERS p_xzip_2 TYPE xstring NO-display.
+PARAMETERS r_compa2 NO-DISPLAY.
+PARAMETERS p_xzip_1 TYPE xstring NO-DISPLAY.
+PARAMETERS p_xzip_2 TYPE xstring NO-DISPLAY.
 
 SELECTION-SCREEN BEGIN OF SCREEN 1001.
 SELECTION-SCREEN FUNCTION KEY 1.

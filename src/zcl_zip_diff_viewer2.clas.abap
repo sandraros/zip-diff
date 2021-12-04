@@ -11,12 +11,14 @@ CLASS zcl_zip_diff_viewer2 DEFINITION
 
     METHODS diff_and_view
       IMPORTING
-        zip_1 TYPE REF TO cl_abap_zip
-        zip_2 TYPE REF TO cl_abap_zip.
+        zip_old TYPE REF TO cl_abap_zip
+        zip_new TYPE REF TO cl_abap_zip.
 
     EVENTS selection_changed
       EXPORTING
-        VALUE(node) TYPE zcl_zip_diff_item=>ty_diff_item.
+        VALUE(node) TYPE zcl_zip_diff_item=>ty_diff_item
+        VALUE(zip_old) TYPE REF TO cl_abap_zip
+        VALUE(zip_new) TYPE REF TO cl_abap_zip.
 
   PROTECTED SECTION.
   PRIVATE SECTION.
@@ -39,7 +41,9 @@ CLASS zcl_zip_diff_viewer2 DEFINITION
 
     DATA: container TYPE REF TO cl_gui_container,
           go_tree   TYPE REF TO cl_column_tree_model,
-          node_key  TYPE i.
+          node_key  TYPE i,
+          zip_old   TYPE REF TO cl_abap_zip,
+          zip_new   TYPE REF TO cl_abap_zip.
 
 ENDCLASS.
 
@@ -57,7 +61,10 @@ CLASS zcl_zip_diff_viewer2 IMPLEMENTATION.
 
   METHOD diff_and_view.
 
-    DATA(zip_diff) = zcl_zip_diff_item=>get_diff( zip_1 = zip_1 zip_2 = zip_2 ).
+    me->zip_old = zip_old.
+    me->zip_new = zip_new.
+
+    DATA(zip_diff) = zcl_zip_diff_item=>get_diff( zip_1 = zip_old zip_2 = zip_new ).
 
     view( zip_diff ).
 
@@ -70,7 +77,6 @@ CLASS zcl_zip_diff_viewer2 IMPLEMENTATION.
 
     IF go_tree IS NOT BOUND.
       ls_hierarchy_header-heading = 'ZIP Hierarchy'(001).
-*      ls_hierarchy_header-width = 30.
 
       CREATE OBJECT go_tree
         EXPORTING
@@ -110,14 +116,14 @@ CLASS zcl_zip_diff_viewer2 IMPLEMENTATION.
 
       go_tree->create_tree_control( parent = container ).
 
-      set handler on_selection_changed for go_tree.
+      SET HANDLER on_selection_changed FOR go_tree.
       go_tree->set_registered_events(
         EXPORTING
           events                    = VALUE #( ( eventid = cl_tree_model=>eventid_selection_changed ) )
         EXCEPTIONS
           illegal_event_combination = 1
           unknown_event             = 2
-          others                    = 3 ).
+          OTHERS                    = 3 ).
       IF sy-subrc <> 0.
 *       MESSAGE ID sy-msgid TYPE sy-msgty NUMBER sy-msgno
 *                  WITH sy-msgv1 sy-msgv2 sy-msgv3 sy-msgv4.
@@ -281,9 +287,17 @@ CLASS zcl_zip_diff_viewer2 IMPLEMENTATION.
 *                WITH sy-msgv1 sy-msgv2 sy-msgv3 sy-msgv4.
     ENDIF.
 
+    if user_object is bound.
+
     DATA(diff_item) = CAST zcl_zip_diff_item( user_object ).
 
-    RAISE EVENT selection_changed EXPORTING node = diff_item->items[ local_name = item-text ].
+    RAISE EVENT selection_changed
+        EXPORTING
+            node    = diff_item->items[ local_name = item-text ]
+            zip_old = zip_old
+            zip_new = zip_new.
+
+    endif.
 
   ENDMETHOD.
 
