@@ -43,7 +43,8 @@ CLASS zcl_zip_diff_viewer2 DEFINITION
           go_tree   TYPE REF TO cl_column_tree_model,
           node_key  TYPE i,
           zip_old   TYPE REF TO cl_abap_zip,
-          zip_new   TYPE REF TO cl_abap_zip.
+          zip_new   TYPE REF TO cl_abap_zip,
+          diff_file TYPE REF TO zcl_zip_diff_file_ext.
 
 ENDCLASS.
 
@@ -55,6 +56,8 @@ CLASS zcl_zip_diff_viewer2 IMPLEMENTATION.
   METHOD constructor.
 
     me->container = io_container.
+    diff_file = NEW zcl_zip_diff_file_ext( ).
+    SET HANDLER diff_file->on_selection_changed FOR me.
 
   ENDMETHOD.
 

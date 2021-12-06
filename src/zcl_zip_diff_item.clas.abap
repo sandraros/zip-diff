@@ -46,8 +46,9 @@ CLASS zcl_zip_diff_item DEFINITION
       RETURNING
         VALUE(result) TYPE REF TO zcl_zip_diff_item."ty_diff_items.
 
-    DATA: path  TYPE string READ-ONLY,
-          items TYPE ty_diff_items READ-ONLY.
+    DATA: path         TYPE string READ-ONLY,
+          items        TYPE ty_diff_items READ-ONLY,
+          is_different TYPE abap_bool READ-ONLY.
 
   PROTECTED SECTION.
   PRIVATE SECTION.
@@ -190,6 +191,11 @@ CLASS zcl_zip_diff_item IMPLEMENTATION.
       INSERT diff_item INTO TABLE result->items.
 
     ENDWHILE.
+
+    LOOP AT result->items TRANSPORTING NO FIELDS WHERE diff_state <> state-same.
+      EXIT.
+    ENDLOOP.
+    result->is_different = boolc( sy-subrc = 0 ).
 
   ENDMETHOD.
 
