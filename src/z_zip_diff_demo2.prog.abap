@@ -10,6 +10,12 @@ DATA zip_diff TYPE REF TO zcl_zip_diff_viewer2.
 PARAMETERS dummy.
 
 AT SELECTION-SCREEN OUTPUT.
+  DATA(excluded_functions) = VALUE ui_functions( ( 'ONLI' ) ( 'PRIN' ) ( 'SPOS' ) ).
+  CALL FUNCTION 'RS_SET_SELSCREEN_STATUS'
+    EXPORTING
+      p_status  = sy-pfkey
+    TABLES
+      p_exclude = excluded_functions.
   IF zip_diff IS NOT BOUND.
     zip_diff = NEW #( cl_gui_container=>screen0 ).
     DATA(zip_old) = NEW cl_abap_zip( ).
