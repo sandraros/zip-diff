@@ -11,8 +11,10 @@ CLASS zcl_zip_diff_viewer2 DEFINITION
 
     METHODS diff_and_view
       IMPORTING
-        zip_old TYPE REF TO cl_abap_zip
-        zip_new TYPE REF TO cl_abap_zip.
+        title_old TYPE csequence OPTIONAL
+        title_new TYPE csequence OPTIONAL
+        zip_old   TYPE REF TO cl_abap_zip
+        zip_new   TYPE REF TO cl_abap_zip.
 
     EVENTS selection_changed
       EXPORTING
@@ -39,12 +41,16 @@ CLASS zcl_zip_diff_viewer2 DEFINITION
                   FOR EVENT selection_changed OF cl_tree_model
       IMPORTING node_key.
 
-    DATA: container TYPE REF TO cl_gui_container,
-          go_tree   TYPE REF TO cl_column_tree_model,
-          node_key  TYPE i,
-          zip_old   TYPE REF TO cl_abap_zip,
-          zip_new   TYPE REF TO cl_abap_zip,
-          diff_file TYPE REF TO zcl_zip_diff_file_ext.
+    DATA: container   TYPE REF TO cl_gui_container,
+          go_splitter TYPE REF TO cl_gui_splitter_container,
+          go_toolbar  TYPE REF TO cl_gui_toolbar,
+          go_tree     TYPE REF TO cl_column_tree_model,
+          node_key    TYPE i,
+          title_old   TYPE text40,
+          title_new   TYPE text40,
+          zip_old     TYPE REF TO cl_abap_zip,
+          zip_new     TYPE REF TO cl_abap_zip,
+          diff_file   TYPE REF TO zcl_zip_diff_file_ext.
 
 ENDCLASS.
 
@@ -64,6 +70,8 @@ CLASS zcl_zip_diff_viewer2 IMPLEMENTATION.
 
   METHOD diff_and_view.
 
+    me->title_old = title_old.
+    me->title_new = title_new.
     me->zip_old = zip_old.
     me->zip_new = zip_new.
 
@@ -81,43 +89,64 @@ CLASS zcl_zip_diff_viewer2 IMPLEMENTATION.
     IF go_tree IS NOT BOUND.
       ls_hierarchy_header-heading = 'ZIP Hierarchy'(001).
 
-      CREATE OBJECT go_tree
-        EXPORTING
+      go_splitter = NEW #( parent = container rows = 2 columns = 1 ).
+      go_splitter->set_row_height( id = 1 height = 5 ).
+      go_splitter->set_row_sash( id = 1 type = go_splitter->type_sashvisible value = go_splitter->false ).
+
+      go_toolbar = NEW #( parent = go_splitter->get_container( row = 1 column = 1 ) display_mode = cl_gui_toolbar=>m_mode_horizontal ).
+      go_toolbar->add_button(
+                fcode       = 'TITLE_OLD'
+                icon        = icon_release
+                butn_type   = cntb_btype_button
+                text        = title_old ).
+      go_toolbar->add_button(
+                fcode       = 'TITLE_NEW'
+                icon        = icon_complete
+                butn_type   = cntb_btype_button
+                text        = title_new ).
+
+      go_tree = NEW #(
           node_selection_mode   = cl_gui_simple_tree=>node_sel_mode_single
           hierarchy_column_name = 'C1'
-          hierarchy_header      = ls_hierarchy_header.
+          hierarchy_header      = ls_hierarchy_header ).
 
       go_tree->add_column(
-            name = 'DATE_1'
-            width = 0
-            header_text = 'Date 1' ).
+            name         = 'DATE_1'
+            width        = 0
+            HEADER_image = conv #( icon_release )
+            header_text  = 'Date' ).
 
       go_tree->add_column(
-            name = 'DATE_2'
-            width = 0
-            header_text = 'Date 2' ).
+            name         = 'DATE_2'
+            width        = 0
+            HEADER_image = conv #( icon_complete )
+            header_text  = 'Date' ).
 
       go_tree->add_column(
-            name = 'TIME_1'
-            width = 0
-            header_text = 'Time 1' ).
+            name         = 'TIME_1'
+            width        = 0
+            HEADER_image = conv #( icon_release )
+            header_text  = 'Time' ).
 
       go_tree->add_column(
-            name = 'TIME_2'
-            width = 0
-            header_text = 'Time 2' ).
+            name         = 'TIME_2'
+            width        = 0
+            HEADER_image = conv #( icon_complete )
+            header_text  = 'Time' ).
 
       go_tree->add_column(
-            name = 'SIZE_1'
-            width = 0
-            header_text = 'Size 1' ).
+            name         = 'SIZE_1'
+            width        = 0
+            HEADER_image = conv #( icon_release )
+            header_text  = 'Size' ).
 
       go_tree->add_column(
-            name = 'SIZE_2'
-            width = 0
-            header_text = 'Size 2' ).
+            name         = 'SIZE_2'
+            width        = 0
+            HEADER_image = conv #( icon_complete )
+            header_text  = 'Size' ).
 
-      go_tree->create_tree_control( parent = container ).
+      go_tree->create_tree_control( parent = go_splitter->get_container( row = 2 column = 1 ) ).
 
       SET HANDLER on_selection_changed FOR go_tree.
       go_tree->set_registered_events(
@@ -290,17 +319,17 @@ CLASS zcl_zip_diff_viewer2 IMPLEMENTATION.
 *                WITH sy-msgv1 sy-msgv2 sy-msgv3 sy-msgv4.
     ENDIF.
 
-    if user_object is bound.
+    IF user_object IS BOUND.
 
-    DATA(diff_item) = CAST zcl_zip_diff_item( user_object ).
+      DATA(diff_item) = CAST zcl_zip_diff_item( user_object ).
 
-    RAISE EVENT selection_changed
-        EXPORTING
-            node    = diff_item->items[ local_name = item-text ]
-            zip_old = zip_old
-            zip_new = zip_new.
+      RAISE EVENT selection_changed
+          EXPORTING
+              node    = diff_item->items[ local_name = item-text ]
+              zip_old = zip_old
+              zip_new = zip_new.
 
-    endif.
+    ENDIF.
 
   ENDMETHOD.
 
