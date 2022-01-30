@@ -25,7 +25,9 @@ CLASS zcl_zip_diff_viewer2 DEFINITION
   PROTECTED SECTION.
   PRIVATE SECTION.
 
-    CONSTANTS state LIKE zcl_zip_diff_item=>state VALUE zcl_zip_diff_item=>state.
+    CONSTANTS: state    LIKE zcl_zip_diff_item=>state VALUE zcl_zip_diff_item=>state,
+               icon_old TYPE tv_image VALUE icon_create,
+               icon_new TYPE tv_image VALUE icon_msg.
 
     METHODS add_tree_nodes
       IMPORTING
@@ -96,12 +98,12 @@ CLASS zcl_zip_diff_viewer2 IMPLEMENTATION.
       go_toolbar = NEW #( parent = go_splitter->get_container( row = 1 column = 1 ) display_mode = cl_gui_toolbar=>m_mode_horizontal ).
       go_toolbar->add_button(
                 fcode       = 'TITLE_OLD'
-                icon        = icon_release
+                icon        = icon_old
                 butn_type   = cntb_btype_button
                 text        = title_old ).
       go_toolbar->add_button(
                 fcode       = 'TITLE_NEW'
-                icon        = icon_complete
+                icon        = icon_new
                 butn_type   = cntb_btype_button
                 text        = title_new ).
 
@@ -113,37 +115,37 @@ CLASS zcl_zip_diff_viewer2 IMPLEMENTATION.
       go_tree->add_column(
             name         = 'DATE_1'
             width        = 0
-            HEADER_image = conv #( icon_release )
+            header_image = icon_old
             header_text  = 'Date' ).
 
       go_tree->add_column(
             name         = 'DATE_2'
             width        = 0
-            HEADER_image = conv #( icon_complete )
+            header_image = icon_new
             header_text  = 'Date' ).
 
       go_tree->add_column(
             name         = 'TIME_1'
             width        = 0
-            HEADER_image = conv #( icon_release )
+            header_image = icon_old
             header_text  = 'Time' ).
 
       go_tree->add_column(
             name         = 'TIME_2'
             width        = 0
-            HEADER_image = conv #( icon_complete )
+            header_image = icon_new
             header_text  = 'Time' ).
 
       go_tree->add_column(
             name         = 'SIZE_1'
             width        = 0
-            HEADER_image = conv #( icon_release )
+            header_image = icon_old
             header_text  = 'Size' ).
 
       go_tree->add_column(
             name         = 'SIZE_2'
             width        = 0
-            HEADER_image = conv #( icon_complete )
+            header_image = icon_new
             header_text  = 'Size' ).
 
       go_tree->create_tree_control( parent = go_splitter->get_container( row = 2 column = 1 ) ).

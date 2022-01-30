@@ -337,8 +337,10 @@ CLASS lcl_app IMPLEMENTATION.
           SET HANDLER on_selection_changed FOR viewer.
 
           viewer->diff_and_view(
-              zip_old = zip_old
-              zip_new = zip_new ).
+              title_old = 'Old version'
+              title_new = 'New version'
+              zip_old   = zip_old
+              zip_new   = zip_new ).
 
         ENDIF.
 
