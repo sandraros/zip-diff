@@ -148,6 +148,25 @@ CLASS lcl_app IMPLEMENTATION.
                   WHEN 'MIM'.
                     ls_screen-active = '1'.
                     MODIFY SCREEN FROM ls_screen.
+                  WHEN 'OPN'.
+                    ls_screen-active = '0'.
+                    MODIFY SCREEN FROM ls_screen.
+                  WHEN 'CMP'.
+                    ls_screen-active = '0'.
+                    MODIFY SCREEN FROM ls_screen.
+                ENDCASE.
+              ENDLOOP.
+
+            WHEN sel( it_sel = lt_sel_255 selname = 'R_OPNXLS' ).
+
+              LOOP AT SCREEN INTO ls_screen.
+                CASE ls_screen-group1.
+                  WHEN 'MIM'.
+                    ls_screen-active = '0'.
+                    MODIFY SCREEN FROM ls_screen.
+                  WHEN 'OPN'.
+                    ls_screen-active = '1'.
+                    MODIFY SCREEN FROM ls_screen.
                   WHEN 'CMP'.
                     ls_screen-active = '0'.
                     MODIFY SCREEN FROM ls_screen.
@@ -159,6 +178,9 @@ CLASS lcl_app IMPLEMENTATION.
               LOOP AT SCREEN INTO ls_screen.
                 CASE ls_screen-group1.
                   WHEN 'MIM'.
+                    ls_screen-active = '0'.
+                    MODIFY SCREEN FROM ls_screen.
+                  WHEN 'OPN'.
                     ls_screen-active = '0'.
                     MODIFY SCREEN FROM ls_screen.
                   WHEN 'CMP'.
@@ -232,6 +254,36 @@ CLASS lcl_app IMPLEMENTATION.
                 go_document = display_document( go_container_left ).
                 go_document->create_document(
                   EXPORTING
+                    open_inplace = abap_true
+                  IMPORTING
+                    error        = error
+                    retcode      = retcode ).
+                APPEND error TO t_errors.
+                xdata = get_document( ).
+
+                CREATE OBJECT zip_new.
+                CALL METHOD zip_new->load
+                  EXPORTING
+                    zip             = xdata
+                  EXCEPTIONS
+                    zip_parse_error = 1
+                    OTHERS          = 2.
+
+                zip_old = zip_new.
+
+              WHEN sel( it_sel = lt_sel_255 selname = 'R_OPNXLS' ).
+
+                lt_itab = VALUE ui_functions( ( 'ONLI' ) ).
+                CALL FUNCTION 'RS_SET_SELSCREEN_STATUS'
+                  EXPORTING
+                    p_status  = sy-pfkey
+                  TABLES
+                    p_exclude = lt_itab.
+
+                go_document = display_document( go_container_left ).
+                go_document->open_document(
+                  EXPORTING
+                    document_url = CONV rvari_val_255( 'file://' && sel( it_sel = lt_sel_255 selname = 'P_OPNXLS' ) )
                     open_inplace = abap_true
                   IMPORTING
                     error        = error
@@ -325,7 +377,8 @@ CLASS lcl_app IMPLEMENTATION.
 
           WHEN 'FC01'. " Compare
 
-            IF sel( it_sel = lt_sel_255 selname = 'R_PROGID' ) = abap_true.
+            IF sel( it_sel = lt_sel_255 selname = 'R_PROGID' ) = abap_true
+            OR sel( it_sel = lt_sel_255 selname = 'R_OPNXLS' ) = abap_true.
 
               get_last_and_previous_zip(
                   IMPORTING
@@ -661,6 +714,8 @@ TABLES sscrfields.
 
 PARAMETERS r_progid RADIOBUTTON GROUP rb1 USER-COMMAND switch DEFAULT 'X'.
 PARAMETERS p_progid TYPE c LENGTH 60 LOWER CASE AS LISTBOX VISIBLE LENGTH 60 MODIF ID mim OBLIGATORY.
+PARAMETERS r_opnxls RADIOBUTTON GROUP rb1.
+PARAMETERS p_opnxls TYPE string LOWER CASE MODIF ID opn.
 PARAMETERS r_compar RADIOBUTTON GROUP rb1.
 PARAMETERS p_zip_1  TYPE string LOWER CASE MODIF ID cmp.
 PARAMETERS p_zip_2  TYPE string LOWER CASE MODIF ID cmp.
@@ -678,6 +733,9 @@ INITIALIZATION.
 
 AT SELECTION-SCREEN OUTPUT.
   app->at_selection_screen_output( ).
+
+AT SELECTION-SCREEN ON VALUE-REQUEST FOR p_opnxls.
+  p_opnxls = app->popup_f4( p_opnxls ).
 
 AT SELECTION-SCREEN ON VALUE-REQUEST FOR p_zip_1.
   p_zip_1 = app->popup_f4( p_zip_1 ).
