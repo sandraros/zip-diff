@@ -10,12 +10,14 @@ DATA zip_diff TYPE REF TO zcl_zip_diff_viewer2.
 PARAMETERS dummy.
 
 AT SELECTION-SCREEN OUTPUT.
+
   DATA(excluded_functions) = VALUE ui_functions( ( 'ONLI' ) ( 'PRIN' ) ( 'SPOS' ) ).
   CALL FUNCTION 'RS_SET_SELSCREEN_STATUS'
     EXPORTING
       p_status  = sy-pfkey
     TABLES
       p_exclude = excluded_functions.
+
   IF zip_diff IS NOT BOUND.
     zip_diff = NEW #( cl_gui_container=>screen0 ).
     DATA(zip_old) = NEW cl_abap_zip( ).
@@ -27,3 +29,9 @@ AT SELECTION-SCREEN OUTPUT.
     zip_diff->diff_and_view( title_old = 'Web Repository .zip file' title_new = 'Demo program .zip file'
                               zip_old = zip_old zip_new = zip_new ).
   ENDIF.
+
+  DATA(screen_field) = VALUE screen( ).
+  LOOP AT SCREEN INTO screen_field.
+    screen-active = '0'.
+    MODIFY SCREEN FROM screen_field.
+  ENDLOOP.
