@@ -23,9 +23,11 @@ AT SELECTION-SCREEN OUTPUT.
     DATA(zip_old) = NEW cl_abap_zip( ).
     zip_old->add( name = 'changed.txt' content = cl_abap_codepage=>convert_to( 'hello world' ) ).
     zip_old->add( name = 'deleted.txt' content = cl_abap_codepage=>convert_to( 'I was deleted' ) ).
+    zip_old->add( name = 'unchanged.txt' content = cl_abap_codepage=>convert_to( 'unchanged' ) ).
     DATA(zip_new) = NEW cl_abap_zip( ).
     zip_new->add( name = 'added.txt' content = cl_abap_codepage=>convert_to( 'I was added' ) ).
     zip_new->add( name = 'changed.txt' content = cl_abap_codepage=>convert_to( 'hey world' ) ).
+    zip_new->add( name = 'unchanged.txt' content = cl_abap_codepage=>convert_to( 'unchanged' ) ).
     zip_diff->diff_and_view( title_old = 'Web Repository .zip file' title_new = 'Demo program .zip file'
                               zip_old = zip_old zip_new = zip_new ).
   ENDIF.
