@@ -5,36 +5,77 @@
 *&---------------------------------------------------------------------*
 REPORT z_zip_diff_demo.
 
+CLASS lcx_app DEFINITION INHERITING FROM cx_static_check.
+  PUBLIC SECTION.
+    METHODS constructor
+      IMPORTING
+        text     TYPE clike
+        previous TYPE REF TO cx_root OPTIONAL.
+    METHODS get_text REDEFINITION.
+    METHODS get_longtext REDEFINITION.
+  PRIVATE SECTION.
+    DATA text TYPE string.
+ENDCLASS.
+
+CLASS lcx_app IMPLEMENTATION.
+  METHOD constructor.
+    super->constructor( textid = textid previous = previous ).
+    me->text = text.
+  ENDMETHOD.
+  METHOD get_text.
+    result = text.
+  ENDMETHOD.
+  METHOD get_longtext.
+    result = get_text( ).
+  ENDMETHOD.
+ENDCLASS.
+
 CLASS lcl_app DEFINITION.
 
   PUBLIC SECTION.
 
     METHODS set_sscrfields IMPORTING sscrfields TYPE REF TO sscrfields.
-    METHODS at_selection_screen_output.
-    METHODS at_selection_screen.
+
+    METHODS at_selection_screen_output
+      RAISING
+        lcx_app.
+
+    METHODS at_selection_screen
+      RAISING
+        lcx_app.
+
     METHODS at_selection_screen_on_exit.
+
     METHODS popup_f4
       IMPORTING
         current_file  TYPE string
       RETURNING
-        VALUE(result) TYPE string.
+        VALUE(result) TYPE string
+      RAISING
+        lcx_app.
 
   PRIVATE SECTION.
 
     TYPES : ty_tree_nodes TYPE STANDARD TABLE OF ixmltree1 WITH EMPTY KEY,
-            ty_diff_state TYPE zcl_zip_diff_item=>ty_diff_item-diff_state.
+            ty_diff_state TYPE zcl_zip_diff_item=>ty_diff_item-diff_state,
+            ty_table_sel  TYPE STANDARD TABLE OF rsparamsl_255 WITH DEFAULT KEY.
     CONSTANTS state LIKE zcl_zip_diff_item=>state VALUE zcl_zip_diff_item=>state.
 
-    METHODS load_binary_file
+    METHODS gui_upload
       IMPORTING
         path           TYPE csequence
       RETURNING
-        VALUE(content) TYPE xstring.
+        VALUE(content) TYPE xstring
+      RAISING
+        lcx_app.
+
     METHODS display_document
       IMPORTING
         container     TYPE REF TO cl_gui_container
       RETURNING
-        VALUE(result) TYPE REF TO i_oi_document_proxy.
+        VALUE(result) TYPE REF TO i_oi_document_proxy
+      RAISING
+        lcx_app.
 
     METHODS get_document
       RETURNING
@@ -43,18 +84,22 @@ CLASS lcl_app DEFINITION.
     METHODS get_last_and_previous_zip
       EXPORTING
         eo_zip_old TYPE REF TO cl_abap_zip
-        eo_zip     TYPE REF TO cl_abap_zip.
+        eo_zip     TYPE REF TO cl_abap_zip
+      RAISING
+        lcx_app.
 
     METHODS gui_download
       IMPORTING
         i_content   TYPE xstring
-        i_file_path TYPE string.
+        i_file_path TYPE string
+      RAISING
+        lcx_app.
 
     METHODS xml_pretty_print
       CHANGING
-        c_content TYPE xstring.
-
-    TYPES ty_table_sel TYPE STANDARD TABLE OF rsparamsl_255 WITH DEFAULT KEY.
+        c_content TYPE xstring
+      RAISING
+        lcx_app.
 
     METHODS sel
       IMPORTING
@@ -63,16 +108,39 @@ CLASS lcl_app DEFINITION.
       RETURNING
         VALUE(result) TYPE string.
 
+    METHODS at_selection_screen_output1000
+      RAISING
+        lcx_app.
+
+    METHODS at_selection_screen_output1001
+      RAISING
+        lcx_app.
+
     METHODS on_selection_changed
                   FOR EVENT selection_changed OF zcl_zip_diff_viewer2
       IMPORTING node.
+
+    METHODS check_doi_error
+      IMPORTING
+        error   TYPE REF TO i_oi_error
+        retcode TYPE soi_ret_string
+        context TYPE string
+      RAISING
+        lcx_app.
+
+    METHODS gui_upload_zip
+      IMPORTING
+        zip_path      TYPE csequence
+      RETURNING
+        VALUE(result) TYPE REF TO cl_abap_zip
+      RAISING
+        lcx_app.
 
     DATA: sscrfields            TYPE REF TO sscrfields,
           go_splitter_container TYPE REF TO cl_gui_splitter_container,
           go_container_left     TYPE REF TO cl_gui_container,
           go_container_right    TYPE REF TO cl_gui_container,
           error                 TYPE REF TO i_oi_error,
-          t_errors              TYPE STANDARD TABLE OF REF TO i_oi_error WITH NON-UNIQUE DEFAULT KEY,
           go_control            TYPE REF TO i_oi_container_control,
           go_document           TYPE REF TO i_oi_document_proxy,
           xdata                 TYPE xstring,
@@ -86,7 +154,8 @@ CLASS lcl_app DEFINITION.
           zip_new               TYPE REF TO cl_abap_zip,
           temp_dir              TYPE string,
           viewer                TYPE REF TO zcl_zip_diff_viewer2,
-          lt_sel_255            TYPE TABLE OF rsparamsl_255.
+          lt_sel_255            TYPE TABLE OF rsparamsl_255,
+          file_content          TYPE xstring.
 ENDCLASS.
 
 CLASS lcl_app IMPLEMENTATION.
@@ -108,92 +177,120 @@ CLASS lcl_app IMPLEMENTATION.
 
       WHEN 1000.
 
-        DATA(lt_value) = VALUE vrm_values(
-            ( key = 'excel.sheet'      text = 'MS Excel' )
-            ( key = 'word.document'    text = 'MS Word' )
-            ( key = 'powerpoint.slide' text = 'MS Powerpoint' ) ).
-
-        CALL FUNCTION 'VRM_SET_VALUES'
-          EXPORTING
-            id              = 'P_PROGID'
-            values          = lt_value
-          EXCEPTIONS
-            id_illegal_name = 1
-            OTHERS          = 2.
-
-        ASSIGN ('P_PROGID') TO FIELD-SYMBOL(<progid>).
-        ASSERT sy-subrc = 0.
-        IF NOT line_exists( lt_value[ key = <progid> ] ).
-          <progid> = lt_value[ 1 ]-key.
-        ENDIF.
-
-        CALL FUNCTION 'RS_REFRESH_FROM_SELECTOPTIONS'
-          EXPORTING
-            curr_report         = sy-repid
-          TABLES
-            selection_table     = lt_dummy
-            selection_table_255 = lt_sel_255
-          EXCEPTIONS
-            not_found           = 1
-            no_report           = 2
-            OTHERS              = 3.
-
-        IF abap_false = sel( it_sel = lt_sel_255 selname = 'R_COMPA2' ).
-
-          CASE abap_true.
-            WHEN sel( it_sel = lt_sel_255 selname = 'R_PROGID' ).
-
-              LOOP AT SCREEN INTO ls_screen.
-                CASE ls_screen-group1.
-                  WHEN 'MIM'.
-                    ls_screen-active = '1'.
-                    MODIFY SCREEN FROM ls_screen.
-                  WHEN 'OPN'.
-                    ls_screen-active = '0'.
-                    MODIFY SCREEN FROM ls_screen.
-                  WHEN 'CMP'.
-                    ls_screen-active = '0'.
-                    MODIFY SCREEN FROM ls_screen.
-                ENDCASE.
-              ENDLOOP.
-
-            WHEN sel( it_sel = lt_sel_255 selname = 'R_OPNXLS' ).
-
-              LOOP AT SCREEN INTO ls_screen.
-                CASE ls_screen-group1.
-                  WHEN 'MIM'.
-                    ls_screen-active = '0'.
-                    MODIFY SCREEN FROM ls_screen.
-                  WHEN 'OPN'.
-                    ls_screen-active = '1'.
-                    MODIFY SCREEN FROM ls_screen.
-                  WHEN 'CMP'.
-                    ls_screen-active = '0'.
-                    MODIFY SCREEN FROM ls_screen.
-                ENDCASE.
-              ENDLOOP.
-
-            WHEN OTHERS.
-
-              LOOP AT SCREEN INTO ls_screen.
-                CASE ls_screen-group1.
-                  WHEN 'MIM'.
-                    ls_screen-active = '0'.
-                    MODIFY SCREEN FROM ls_screen.
-                  WHEN 'OPN'.
-                    ls_screen-active = '0'.
-                    MODIFY SCREEN FROM ls_screen.
-                  WHEN 'CMP'.
-                    ls_screen-active = '1'.
-                    MODIFY SCREEN FROM ls_screen.
-                ENDCASE.
-              ENDLOOP.
-
-          ENDCASE.
-
-        ENDIF.
+        at_selection_screen_output1000( ).
 
       WHEN 1001.
+
+        at_selection_screen_output1001( ).
+
+    ENDCASE.
+
+  ENDMETHOD.
+
+
+  METHOD at_selection_screen_output1000.
+
+    DATA: lt_dummy  TYPE TABLE OF rsparams,
+          ls_screen TYPE screen.
+
+    DATA(lt_value) = VALUE vrm_values(
+        ( key = 'excel.sheet'      text = 'MS Excel' )
+        ( key = 'word.document'    text = 'MS Word' )
+        ( key = 'powerpoint.slide' text = 'MS Powerpoint' ) ).
+
+    CALL FUNCTION 'VRM_SET_VALUES'
+      EXPORTING
+        id              = 'P_PROGID'
+        values          = lt_value
+      EXCEPTIONS
+        id_illegal_name = 1
+        OTHERS          = 2.
+    IF sy-subrc <> 0.
+      RAISE EXCEPTION NEW lcx_app( 'VRM_SET_VALUES' ).
+    ENDIF.
+
+    ASSIGN ('P_PROGID') TO FIELD-SYMBOL(<progid>).
+    ASSERT sy-subrc = 0.
+    IF NOT line_exists( lt_value[ key = <progid> ] ).
+      <progid> = lt_value[ 1 ]-key.
+    ENDIF.
+
+    CALL FUNCTION 'RS_REFRESH_FROM_SELECTOPTIONS'
+      EXPORTING
+        curr_report         = sy-repid
+      TABLES
+        selection_table     = lt_dummy
+        selection_table_255 = lt_sel_255
+      EXCEPTIONS
+        not_found           = 1
+        no_report           = 2
+        OTHERS              = 3.
+    IF sy-subrc <> 0.
+      RAISE EXCEPTION NEW lcx_app( 'RS_REFRESH_FROM_SELECTOPTIONS' ).
+    ENDIF.
+
+    IF abap_false = sel( it_sel = lt_sel_255 selname = 'R_COMPA2' ).
+
+      CASE abap_true.
+        WHEN sel( it_sel = lt_sel_255 selname = 'R_PROGID' ).
+
+          LOOP AT SCREEN INTO ls_screen.
+            CASE ls_screen-group1.
+              WHEN 'MIM'.
+                ls_screen-input = '1'.
+                MODIFY SCREEN FROM ls_screen.
+              WHEN 'OPN'.
+                ls_screen-input = '0'.
+                MODIFY SCREEN FROM ls_screen.
+              WHEN 'CMP'.
+                ls_screen-input = '0'.
+                MODIFY SCREEN FROM ls_screen.
+            ENDCASE.
+          ENDLOOP.
+
+        WHEN sel( it_sel = lt_sel_255 selname = 'R_OPNXLS' ).
+
+          LOOP AT SCREEN INTO ls_screen.
+            CASE ls_screen-group1.
+              WHEN 'MIM'.
+                ls_screen-input = '0'.
+                MODIFY SCREEN FROM ls_screen.
+              WHEN 'OPN'.
+                ls_screen-input = '1'.
+                MODIFY SCREEN FROM ls_screen.
+              WHEN 'CMP'.
+                ls_screen-input = '0'.
+                MODIFY SCREEN FROM ls_screen.
+            ENDCASE.
+          ENDLOOP.
+
+        WHEN sel( it_sel = lt_sel_255 selname = 'R_COMPAR' ).
+
+          LOOP AT SCREEN INTO ls_screen.
+            CASE ls_screen-group1.
+              WHEN 'MIM'.
+                ls_screen-input = '0'.
+                MODIFY SCREEN FROM ls_screen.
+              WHEN 'OPN'.
+                ls_screen-input = '0'.
+                MODIFY SCREEN FROM ls_screen.
+              WHEN 'CMP'.
+                ls_screen-input = '1'.
+                MODIFY SCREEN FROM ls_screen.
+            ENDCASE.
+          ENDLOOP.
+
+      ENDCASE.
+
+    ENDIF.
+
+  ENDMETHOD.
+
+
+  METHOD at_selection_screen_output1001.
+    DATA: lt_itab TYPE ui_functions.
+
+    TRY.
 
         IF go_splitter_container IS NOT BOUND.
 
@@ -202,6 +299,7 @@ CLASS lcl_app IMPLEMENTATION.
               parent  = cl_gui_container=>screen0
               rows    = 1
               columns = 2.
+
           go_container_left = go_splitter_container->get_container( row = 1 column = 1 ).
           go_container_right = go_splitter_container->get_container( row = 1 column = 2 ).
           sscrfields->functxt_01 = '@46@Compare'.
@@ -213,7 +311,7 @@ CLASS lcl_app IMPLEMENTATION.
               cntl_error   = 1
               error_no_gui = 2.
           IF sy-subrc <> 0.
-            " Error handling
+            RAISE EXCEPTION NEW lcx_app( 'cl_gui_frontend_services=>get_temp_directory' ).
           ENDIF.
 
           IF abap_true = sel( it_sel = lt_sel_255 selname = 'R_COMPA2' ).
@@ -228,6 +326,9 @@ CLASS lcl_app IMPLEMENTATION.
               EXCEPTIONS
                 zip_parse_error = 1
                 OTHERS          = 2.
+            IF sy-subrc <> 0.
+              RAISE EXCEPTION NEW lcx_app( 'zip_old->load' ).
+            ENDIF.
 
             ASSIGN ('P_XZIP_2') TO <xstring>.
 
@@ -238,6 +339,9 @@ CLASS lcl_app IMPLEMENTATION.
               EXCEPTIONS
                 zip_parse_error = 1
                 OTHERS          = 2.
+            IF sy-subrc <> 0.
+              RAISE EXCEPTION NEW lcx_app( 'zip_new->load' ).
+            ENDIF.
 
           ELSE.
 
@@ -258,7 +362,8 @@ CLASS lcl_app IMPLEMENTATION.
                   IMPORTING
                     error        = error
                     retcode      = retcode ).
-                APPEND error TO t_errors.
+                check_doi_error( error = error retcode = retcode context = 'go_document->create_document' ).
+
                 xdata = get_document( ).
 
                 CREATE OBJECT zip_new.
@@ -268,6 +373,9 @@ CLASS lcl_app IMPLEMENTATION.
                   EXCEPTIONS
                     zip_parse_error = 1
                     OTHERS          = 2.
+                IF sy-subrc <> 0.
+                  RAISE EXCEPTION NEW lcx_app( 'zip_new->load' ).
+                ENDIF.
 
                 zip_old = zip_new.
 
@@ -281,14 +389,17 @@ CLASS lcl_app IMPLEMENTATION.
                     p_exclude = lt_itab.
 
                 go_document = display_document( go_container_left ).
-                go_document->open_document(
+                DATA(document_table) = cl_bcs_convert=>xstring_to_solix( file_content ).
+                go_document->open_document_from_table(
                   EXPORTING
-                    document_url = CONV rvari_val_255( 'file://' && sel( it_sel = lt_sel_255 selname = 'P_OPNXLS' ) )
-                    open_inplace = abap_true
+                    document_size  = xstrlen( file_content )
+                    document_table = document_table
+                    open_inplace   = abap_true
                   IMPORTING
-                    error        = error
-                    retcode      = retcode ).
-                APPEND error TO t_errors.
+                    error          = error
+                    retcode        = retcode ).
+                check_doi_error( error = error retcode = retcode context = 'go_document->open_document_from_table' ).
+
                 xdata = get_document( ).
 
                 CREATE OBJECT zip_new.
@@ -298,10 +409,13 @@ CLASS lcl_app IMPLEMENTATION.
                   EXCEPTIONS
                     zip_parse_error = 1
                     OTHERS          = 2.
+                IF sy-subrc <> 0.
+                  RAISE EXCEPTION NEW lcx_app( 'zip_new->load' ).
+                ENDIF.
 
                 zip_old = zip_new.
 
-              WHEN OTHERS.
+              WHEN sel( it_sel = lt_sel_255 selname = 'R_COMPAR' ).
 
                 lt_itab = VALUE ui_functions( ( 'ONLI' ) ( 'FC01' ) ).
                 CALL FUNCTION 'RS_SET_SELSCREEN_STATUS'
@@ -309,25 +423,6 @@ CLASS lcl_app IMPLEMENTATION.
                     p_status  = sy-pfkey
                   TABLES
                     p_exclude = lt_itab.
-
-                xdata = load_binary_file( path = sel( it_sel = lt_sel_255 selname = 'P_ZIP_1' ) ).
-
-                CREATE OBJECT zip_old.
-                CALL METHOD zip_old->load
-                  EXPORTING
-                    zip             = xdata
-                  EXCEPTIONS
-                    zip_parse_error = 1
-                    OTHERS          = 2.
-
-                xdata = load_binary_file( path = sel( it_sel = lt_sel_255 selname = 'P_ZIP_2' ) ).
-                CREATE OBJECT zip_new.
-                CALL METHOD zip_new->load
-                  EXPORTING
-                    zip             = xdata
-                  EXCEPTIONS
-                    zip_parse_error = 1
-                    OTHERS          = 2.
 
             ENDCASE.
 
@@ -344,7 +439,17 @@ CLASS lcl_app IMPLEMENTATION.
 
         ENDIF.
 
-    ENDCASE.
+      CATCH lcx_app INTO DATA(error2).
+        IF go_control IS BOUND.
+          go_control->release_all_documents( ).
+          go_control->destroy_control( ).
+        ENDIF.
+        CLEAR: go_document, go_control.
+        SUPPRESS DIALOG.
+        SET SCREEN 0.
+        RAISE EXCEPTION error2.
+*CATCH lcx_app INTO DATA(error).
+    ENDTRY.
 
   ENDMETHOD.
 
@@ -367,9 +472,21 @@ CLASS lcl_app IMPLEMENTATION.
             not_found           = 1
             no_report           = 2
             OTHERS              = 3.
+        IF sy-subrc <> 0.
+          RAISE EXCEPTION NEW lcx_app( 'RS_REFRESH_FROM_SELECTOPTIONS' ).
+        ENDIF.
 
         CASE sscrfields->ucomm.
           WHEN 'ONLI'.
+            IF abap_false = sel( it_sel = lt_sel_255 selname = 'R_COMPA2' ).
+              CASE abap_true.
+                WHEN sel( it_sel = lt_sel_255 selname = 'R_OPNXLS' ).
+                  file_content = gui_upload( sel( it_sel = lt_sel_255 selname = 'P_OPNXLS' ) ).
+                WHEN sel( it_sel = lt_sel_255 selname = 'R_COMPAR' ).
+                  zip_old = gui_upload_zip( sel( it_sel = lt_sel_255 selname = 'P_ZIP_1' ) ).
+                  zip_new = gui_upload_zip( sel( it_sel = lt_sel_255 selname = 'P_ZIP_2' ) ).
+              ENDCASE.
+            ENDIF.
             CALL SELECTION-SCREEN 1001.
         ENDCASE.
 
@@ -440,8 +557,9 @@ CLASS lcl_app IMPLEMENTATION.
         not_supported_by_gui    = 4
         OTHERS                  = 5.
     IF sy-subrc NE 0.
-      " TODO process error
-    ELSEIF l_action NE cl_gui_frontend_services=>action_ok.
+      RAISE EXCEPTION NEW lcx_app( 'cl_gui_frontend_services=>file_open_dialog' ).
+    ENDIF.
+    IF l_action NE cl_gui_frontend_services=>action_ok.
       " dialog cancelled by user
     ELSE.
       " 1 or more files selected
@@ -457,8 +575,9 @@ CLASS lcl_app IMPLEMENTATION.
   METHOD display_document.
 
     c_oi_container_control_creator=>get_container_control( IMPORTING control = go_control
-                                                                     error   = error ).
-    APPEND error TO t_errors.
+                                                                     error   = error
+                                                                     retcode = retcode ).
+    check_doi_error( error = error retcode = retcode context = 'c_oi_container_control_creator=>get_container_control' ).
 
     go_control->init_control( EXPORTING  inplace_enabled     = 'X'
                                          no_flush            = 'X'
@@ -467,14 +586,14 @@ CLASS lcl_app IMPLEMENTATION.
                               IMPORTING  error               = error
                                          retcode             = retcode
                               EXCEPTIONS OTHERS              = 2 ).
-    APPEND error TO t_errors.
+    check_doi_error( error = error retcode = retcode context = 'go_control->init_control' ).
 
     go_control->get_document_proxy( EXPORTING document_type  = CONV text255( sel( it_sel = lt_sel_255 selname = 'P_PROGID' ) )
                                               no_flush       = ' '
                                     IMPORTING document_proxy = result
                                               error          = error
                                               retcode        = retcode ).
-    APPEND error TO t_errors.
+    check_doi_error( error = error retcode = retcode context = 'go_control->get_document_proxy' ).
 
   ENDMETHOD.
 
@@ -494,6 +613,9 @@ CLASS lcl_app IMPLEMENTATION.
       EXCEPTIONS
         zip_parse_error = 1
         OTHERS          = 2.
+    IF sy-subrc <> 0.
+      RAISE EXCEPTION NEW lcx_app( 'zip_old->load' ).
+    ENDIF.
 
     CREATE OBJECT eo_zip.
     CALL METHOD eo_zip->load
@@ -502,6 +624,9 @@ CLASS lcl_app IMPLEMENTATION.
       EXCEPTIONS
         zip_parse_error = 1
         OTHERS          = 2.
+    IF sy-subrc <> 0.
+      RAISE EXCEPTION NEW lcx_app( 'zip->load' ).
+    ENDIF.
 
   ENDMETHOD.
 
@@ -536,74 +661,74 @@ CLASS lcl_app IMPLEMENTATION.
           solix_tab    TYPE solix_tab,
           xml_document TYPE REF TO if_ixml_document.
 
-    CASE node-diff_state.
-      WHEN state-changed
-        OR state-only_attribute_changed
-        OR state-only_content_changed.
+    TRY.
 
-        zip_old->get(
-          EXPORTING
-            name                    = node-full_path
-          IMPORTING
-            content                 = content
-          EXCEPTIONS
-            zip_index_error         = 1
-            zip_decompression_error = 2
-            OTHERS                  = 3 ).
-        IF sy-subrc <> 0.
-*        MESSAGE ID sy-msgid TYPE sy-msgty NUMBER sy-msgno
-*                   WITH sy-msgv1 sy-msgv2 sy-msgv3 sy-msgv4.
-        ENDIF.
-        SPLIT node-full_path AT '/' INTO TABLE DATA(parts).
-        DATA(new_parts) = VALUE string_table( ).
-        LOOP AT parts REFERENCE INTO DATA(part).
-          INSERT part->* INTO new_parts INDEX 1.
-        ENDLOOP.
-        DATA(file_old) = temp_dir && '\old_' && concat_lines_of( table = new_parts sep = '_' ) && '.xml'.
-        IF node-full_path CS '.xml'.
-          xml_pretty_print( CHANGING c_content = content ).
-        ENDIF.
-        gui_download(
-              i_content   = content
-              i_file_path = file_old ).
+        CASE node-diff_state.
+          WHEN state-changed
+            OR state-only_attribute_changed
+            OR state-only_content_changed.
 
-        zip_new->get(
-          EXPORTING
-            name                    = node-full_path
-          IMPORTING
-            content                 = content
-          EXCEPTIONS
-            zip_index_error         = 1
-            zip_decompression_error = 2
-            OTHERS                  = 3 ).
-        IF sy-subrc <> 0.
-*        MESSAGE ID sy-msgid TYPE sy-msgty NUMBER sy-msgno
-*                   WITH sy-msgv1 sy-msgv2 sy-msgv3 sy-msgv4.
-        ENDIF.
-        DATA(file_new) = temp_dir && '\new_' && concat_lines_of( table = new_parts sep = '_' ) && '.xml'.
-        IF node-full_path CS '.xml'.
-          xml_pretty_print( CHANGING c_content = content ).
-        ENDIF.
-        gui_download(
-              i_content   = content
-              i_file_path = file_new ).
+            zip_old->get(
+              EXPORTING
+                name                    = node-full_path
+              IMPORTING
+                content                 = content
+              EXCEPTIONS
+                zip_index_error         = 1
+                zip_decompression_error = 2
+                OTHERS                  = 3 ).
+            IF sy-subrc <> 0.
+              RAISE EXCEPTION NEW lcx_app( 'zip_old->get' ).
+            ENDIF.
 
-*      cl_gui_frontend_services=>execute( document = file_new ).
-        cl_gui_frontend_services=>execute(
-            EXPORTING
-              application = 'code'
-              parameter   = |-d "{ file_old }" "{ file_new }"|
-              minimized   = 'X'
-              synchronous = ''
-            EXCEPTIONS
-              OTHERS      = 1 ).
-        IF sy-subrc <> 0.
-*        MESSAGE ID sy-msgid TYPE sy-msgty NUMBER sy-msgno
-*                   WITH sy-msgv1 sy-msgv2 sy-msgv3 sy-msgv4.
-        ENDIF.
+            SPLIT node-full_path AT '/' INTO TABLE DATA(parts).
+            DATA(new_parts) = VALUE string_table( ).
+            LOOP AT parts REFERENCE INTO DATA(part).
+              INSERT part->* INTO new_parts INDEX 1.
+            ENDLOOP.
+            DATA(file_old) = temp_dir && '\old_' && concat_lines_of( table = new_parts sep = '_' ) && '.xml'.
+            IF node-full_path CS '.xml'.
+              xml_pretty_print( CHANGING c_content = content ).
+            ENDIF.
 
-    ENDCASE.
+            gui_download( i_content = content i_file_path = file_old ).
 
+            zip_new->get(
+              EXPORTING
+                name                    = node-full_path
+              IMPORTING
+                content                 = content
+              EXCEPTIONS
+                zip_index_error         = 1
+                zip_decompression_error = 2
+                OTHERS                  = 3 ).
+            IF sy-subrc <> 0.
+              RAISE EXCEPTION NEW lcx_app( 'zip_new->get' ).
+            ENDIF.
+
+            DATA(file_new) = temp_dir && '\new_' && concat_lines_of( table = new_parts sep = '_' ) && '.xml'.
+            IF node-full_path CS '.xml'.
+              xml_pretty_print( CHANGING c_content = content ).
+            ENDIF.
+            gui_download( i_content = content i_file_path = file_new ).
+
+            cl_gui_frontend_services=>execute(
+                EXPORTING
+                  application = 'code'
+                  parameter   = |-d "{ file_old }" "{ file_new }"|
+                  minimized   = 'X'
+                  synchronous = ''
+                EXCEPTIONS
+                  OTHERS      = 1 ).
+            IF sy-subrc <> 0.
+              RAISE EXCEPTION NEW lcx_app( 'cl_gui_frontend_services=>execute' ).
+            ENDIF.
+
+        ENDCASE.
+
+      CATCH cx_root INTO DATA(error).
+        MESSAGE error TYPE 'I' DISPLAY LIKE 'E'.
+    ENDTRY.
 
   ENDMETHOD.
 
@@ -643,11 +768,9 @@ CLASS lcl_app IMPLEMENTATION.
         control_flush_error       = 21
         not_supported_by_gui      = 22
         error_no_gui              = 23
-        OTHERS                    = 24
-    ).
+        OTHERS                    = 24 ).
     IF sy-subrc <> 0.
-*        MESSAGE ID sy-msgid TYPE sy-msgty NUMBER sy-msgno
-*                   WITH sy-msgv1 sy-msgv2 sy-msgv3 sy-msgv4.
+      RAISE EXCEPTION NEW lcx_app( 'cl_gui_frontend_services=>gui_download' ).
     ENDIF.
 
   ENDMETHOD.
@@ -664,6 +787,10 @@ CLASS lcl_app IMPLEMENTATION.
         document = xml_document
       EXCEPTIONS
         OTHERS   = 1.
+    IF sy-subrc <> 0.
+      RAISE EXCEPTION NEW lcx_app( 'SDIXML_XML_TO_DOM' ).
+    ENDIF.
+
     CALL FUNCTION 'SDIXML_DOM_TO_XML'
       EXPORTING
         document      = xml_document
@@ -672,14 +799,17 @@ CLASS lcl_app IMPLEMENTATION.
         xml_as_string = c_content
       EXCEPTIONS
         OTHERS        = 2.
+    IF sy-subrc <> 0.
+      RAISE EXCEPTION NEW lcx_app( 'SDIXML_DOM_TO_XML' ).
+    ENDIF.
 
   ENDMETHOD.
 
 
-  METHOD load_binary_file.
-    DATA l_filename TYPE string.
-    DATA l_length TYPE i.
-    DATA lt_x255 TYPE TABLE OF x255.
+  METHOD gui_upload.
+    DATA: l_filename TYPE string,
+          l_length   TYPE i,
+          lt_solix   TYPE solix_tab.
 
     l_filename = path.
 
@@ -690,24 +820,55 @@ CLASS lcl_app IMPLEMENTATION.
       IMPORTING
         filelength = l_length
       CHANGING
-        data_tab   = lt_x255
+        data_tab   = lt_solix
       EXCEPTIONS
         OTHERS     = 1.
+    IF sy-subrc <> 0.
+      RAISE EXCEPTION NEW lcx_app( 'cl_gui_frontend_services=>gui_upload' ).
+    ENDIF.
 
-    IF sy-subrc = 0.
+    content = cl_bcs_convert=>solix_to_xstring( it_solix = lt_solix iv_size = l_length ).
 
-      cl_swf_utl_convert_xstring=>table_to_xstring(
-        EXPORTING
-          i_table  = lt_x255
-          i_size   = l_length
-        RECEIVING
-          r_stream = content
-        EXCEPTIONS
-          OTHERS   = 3 ).
+  ENDMETHOD.
 
+
+  METHOD check_doi_error.
+    IF error->error_code <> 'OK'.
+      error->raise_message( 'I' ).
+      error->get_message(
+        IMPORTING
+          message_id     = DATA(message_id)
+          message_number = DATA(message_number)
+          param1         = DATA(param1)
+          param2         = DATA(param2)
+          param3         = DATA(param3)
+          param4         = DATA(param4) ).
+      IF message_id IS NOT INITIAL AND message_number IS NOT INITIAL.
+        MESSAGE ID message_id TYPE 'I' NUMBER message_number WITH param1 param2 param3 param4
+            INTO DATA(message_text).
+      ENDIF.
+      RAISE EXCEPTION NEW lcx_app( |{ error->error_code }; { retcode }; { message_text }; { context }| ).
     ENDIF.
   ENDMETHOD.
 
+
+
+  METHOD gui_upload_zip.
+
+    DATA(zip_content) = gui_upload( zip_path ).
+
+    CREATE OBJECT result.
+    CALL METHOD result->load
+      EXPORTING
+        zip             = zip_content
+      EXCEPTIONS
+        zip_parse_error = 1
+        OTHERS          = 2.
+    IF sy-subrc <> 0.
+      RAISE EXCEPTION NEW lcx_app( 'zip_old->load' ).
+    ENDIF.
+
+  ENDMETHOD.
 
 ENDCLASS.
 
@@ -734,19 +895,43 @@ INITIALIZATION.
   app->set_sscrfields( REF #( sscrfields ) ).
 
 AT SELECTION-SCREEN OUTPUT.
-  app->at_selection_screen_output( ).
+  TRY.
+      app->at_selection_screen_output( ).
+    CATCH cx_root INTO DATA(error).
+      MESSAGE error TYPE 'I' DISPLAY LIKE 'E'.
+  ENDTRY.
 
 AT SELECTION-SCREEN ON VALUE-REQUEST FOR p_opnxls.
-  p_opnxls = app->popup_f4( p_opnxls ).
+  TRY.
+      p_opnxls = app->popup_f4( p_opnxls ).
+    CATCH cx_root INTO DATA(error).
+      MESSAGE error TYPE 'E'.
+  ENDTRY.
 
 AT SELECTION-SCREEN ON VALUE-REQUEST FOR p_zip_1.
-  p_zip_1 = app->popup_f4( p_zip_1 ).
+  TRY.
+      p_zip_1 = app->popup_f4( p_zip_1 ).
+    CATCH cx_root INTO DATA(error).
+      MESSAGE error TYPE 'E'.
+  ENDTRY.
 
 AT SELECTION-SCREEN ON VALUE-REQUEST FOR p_zip_2.
-  p_zip_2 = app->popup_f4( p_zip_2 ).
+  TRY.
+      p_zip_2 = app->popup_f4( p_zip_2 ).
+    CATCH cx_root INTO DATA(error).
+      MESSAGE error TYPE 'E'.
+  ENDTRY.
 
 AT SELECTION-SCREEN.
-  app->at_selection_screen( ).
+  TRY.
+      app->at_selection_screen( ).
+    CATCH cx_root INTO DATA(error).
+      MESSAGE error TYPE 'E'.
+  ENDTRY.
 
 AT SELECTION-SCREEN ON EXIT-COMMAND.
-  app->at_selection_screen_on_exit( ).
+  TRY.
+      app->at_selection_screen_on_exit( ).
+    CATCH cx_root INTO DATA(error).
+      MESSAGE error TYPE 'I'.
+  ENDTRY.

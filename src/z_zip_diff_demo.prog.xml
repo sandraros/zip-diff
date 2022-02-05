@@ -5,6 +5,7 @@
    <PROGDIR>
     <NAME>Z_ZIP_DIFF_DEMO</NAME>
     <DBAPL>S</DBAPL>
+    <DBNA>D$</DBNA>
     <SUBC>1</SUBC>
     <FIXPT>X</FIXPT>
     <LDBNAME>D$S</LDBNAME>
@@ -13,8 +14,50 @@
    <TPOOL>
     <item>
      <ID>R</ID>
-     <ENTRY>Demo</ENTRY>
-     <LENGTH>4</LENGTH>
+     <ENTRY>zip-diff demo with new or existing file(s)</ENTRY>
+     <LENGTH>42</LENGTH>
+    </item>
+    <item>
+     <ID>S</ID>
+     <KEY>P_OPNXLS</KEY>
+     <ENTRY>Document path</ENTRY>
+     <LENGTH>21</LENGTH>
+    </item>
+    <item>
+     <ID>S</ID>
+     <KEY>P_PROGID</KEY>
+     <ENTRY>Document type</ENTRY>
+     <LENGTH>21</LENGTH>
+    </item>
+    <item>
+     <ID>S</ID>
+     <KEY>P_ZIP_1</KEY>
+     <ENTRY>ZIP-like &quot;old&quot; file path</ENTRY>
+     <LENGTH>32</LENGTH>
+    </item>
+    <item>
+     <ID>S</ID>
+     <KEY>P_ZIP_2</KEY>
+     <ENTRY>ZIP-like &quot;new&quot; file path</ENTRY>
+     <LENGTH>32</LENGTH>
+    </item>
+    <item>
+     <ID>S</ID>
+     <KEY>R_COMPAR</KEY>
+     <ENTRY>Compare two ZIP-like files</ENTRY>
+     <LENGTH>34</LENGTH>
+    </item>
+    <item>
+     <ID>S</ID>
+     <KEY>R_OPNXLS</KEY>
+     <ENTRY>Edit existing file</ENTRY>
+     <LENGTH>26</LENGTH>
+    </item>
+    <item>
+     <ID>S</ID>
+     <KEY>R_PROGID</KEY>
+     <ENTRY>Edit new file</ENTRY>
+     <LENGTH>21</LENGTH>
     </item>
    </TPOOL>
   </asx:values>
