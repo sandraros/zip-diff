@@ -32,6 +32,6 @@ AT SELECTION-SCREEN OUTPUT.
 
   DATA(screen_field) = VALUE screen( ).
   LOOP AT SCREEN INTO screen_field.
-    screen-active = '0'.
+    screen_field-active = '0'.
     MODIFY SCREEN FROM screen_field.
   ENDLOOP.
