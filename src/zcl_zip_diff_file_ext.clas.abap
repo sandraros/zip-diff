@@ -26,6 +26,22 @@ CLASS zcl_zip_diff_file_ext DEFINITION
 
     CLASS-DATA: temp_dir TYPE string.
 
+    METHODS zip_get_and_gui_download
+      IMPORTING
+        zip           TYPE REF TO cl_abap_zip
+        name          TYPE string
+        prefix        TYPE string
+      RETURNING
+        VALUE(result) TYPE string
+      RAISING
+        zcx_zip_diff.
+
+    METHODS gui_execute
+      IMPORTING
+        i_parameter TYPE string
+      RAISING
+        zcx_zip_diff.
+
     CONSTANTS: state LIKE zcl_zip_diff_item=>state VALUE zcl_zip_diff_item=>state.
 
 ENDCLASS.
@@ -51,74 +67,45 @@ CLASS zcl_zip_diff_file_ext IMPLEMENTATION.
 
 
   METHOD on_selection_changed.
+    DATA: downloaded_file_new TYPE string,
+          downloaded_file_old TYPE string,
+          error               TYPE REF TO cx_root.
 
-    DATA: content      TYPE xstring.
+    TRY.
 
-    CASE node-diff_state.
-      WHEN state-changed
-        OR state-only_attribute_changed
-        OR state-only_content_changed.
+        CASE node-diff_state.
+          WHEN state-added.
 
-        zip_old->get(
-          EXPORTING
-            name                    = node-full_path
-          IMPORTING
-            content                 = content
-          EXCEPTIONS
-            zip_index_error         = 1
-            zip_decompression_error = 2
-            OTHERS                  = 3 ).
-        IF sy-subrc <> 0.
-*        MESSAGE ID sy-msgid TYPE sy-msgty NUMBER sy-msgno
-*                   WITH sy-msgv1 sy-msgv2 sy-msgv3 sy-msgv4.
-        ENDIF.
-        SPLIT node-full_path AT '/' INTO TABLE DATA(parts).
-        DATA(new_parts) = VALUE string_table( ).
-        LOOP AT parts REFERENCE INTO DATA(part).
-          INSERT part->* INTO new_parts INDEX 1.
-        ENDLOOP.
-        DATA(file_old) = temp_dir && '\old_' && concat_lines_of( table = new_parts sep = '_' ) && '.xml'.
-        IF node-full_path CS '.xml'.
-          xml_pretty_print( CHANGING c_content = content ).
-        ENDIF.
-        gui_download( i_content   = content
-                      i_file_path = file_old ).
+            downloaded_file_new = zip_get_and_gui_download( zip = zip_new name = node-full_path prefix = 'added' ).
 
-        zip_new->get(
-          EXPORTING
-            name                    = node-full_path
-          IMPORTING
-            content                 = content
-          EXCEPTIONS
-            zip_index_error         = 1
-            zip_decompression_error = 2
-            OTHERS                  = 3 ).
-        IF sy-subrc <> 0.
-*        MESSAGE ID sy-msgid TYPE sy-msgty NUMBER sy-msgno
-*                   WITH sy-msgv1 sy-msgv2 sy-msgv3 sy-msgv4.
-        ENDIF.
-        DATA(file_new) = temp_dir && '\new_' && concat_lines_of( table = new_parts sep = '_' ) && '.xml'.
-        IF node-full_path CS '.xml'.
-          xml_pretty_print( CHANGING c_content = content ).
-        ENDIF.
-        gui_download(
-              i_content   = content
-              i_file_path = file_new ).
+            gui_execute( |"{ downloaded_file_new }"| ).
 
-        cl_gui_frontend_services=>execute(
-            EXPORTING
-              application = 'code'
-              parameter   = |-d "{ file_old }" "{ file_new }"|
-              minimized   = 'X'
-              synchronous = ''
-            EXCEPTIONS
-              OTHERS      = 1 ).
-        IF sy-subrc <> 0.
-*        MESSAGE ID sy-msgid TYPE sy-msgty NUMBER sy-msgno
-*                   WITH sy-msgv1 sy-msgv2 sy-msgv3 sy-msgv4.
-        ENDIF.
+          WHEN state-changed
+            OR state-only_attribute_changed
+            OR state-only_content_changed.
 
-    ENDCASE.
+            downloaded_file_old = zip_get_and_gui_download( zip = zip_old name = node-full_path prefix = 'old' ).
+            downloaded_file_new = zip_get_and_gui_download( zip = zip_new name = node-full_path prefix = 'new' ).
+
+            gui_execute( |-d "{ downloaded_file_old }" "{ downloaded_file_new }"| ).
+
+          WHEN state-deleted.
+
+            downloaded_file_old = zip_get_and_gui_download( zip = zip_old name = node-full_path prefix = 'deleted' ).
+
+            gui_execute( |"{ downloaded_file_old }"| ).
+
+          WHEN state-same.
+
+            downloaded_file_old = zip_get_and_gui_download( zip = zip_old name = node-full_path prefix = 'same' ).
+
+            gui_execute( |"{ downloaded_file_old }"| ).
+
+        ENDCASE.
+
+      CATCH cx_root INTO error.
+        MESSAGE error TYPE 'I' DISPLAY LIKE 'E'.
+    ENDTRY.
 
   ENDMETHOD.
 
@@ -190,5 +177,64 @@ CLASS zcl_zip_diff_file_ext IMPLEMENTATION.
 
   ENDMETHOD.
 
+
+
+  METHOD gui_execute.
+
+    cl_gui_frontend_services=>execute(
+        EXPORTING
+          application = 'code'
+          parameter   = i_parameter
+          minimized   = 'X'
+          synchronous = ''
+        EXCEPTIONS
+          cntl_error             = 1
+          error_no_gui           = 2
+          bad_parameter          = 3
+          file_not_found         = 4
+          path_not_found         = 5
+          file_extension_unknown = 6
+          error_execute_failed   = 7
+          synchronous_failed     = 8
+          not_supported_by_gui   = 9
+          OTHERS                 = 10 ).
+    IF sy-subrc <> 0.
+      RAISE EXCEPTION NEW zcx_zip_diff( |cl_gui_frontend_services=>execute { sy-subrc } { i_parameter }| ).
+    ENDIF.
+
+  ENDMETHOD.
+
+
+  METHOD zip_get_and_gui_download.
+    DATA: content TYPE xstring.
+
+    zip->get(
+        EXPORTING
+          name                    = name
+        IMPORTING
+          content                 = content
+        EXCEPTIONS
+          zip_index_error         = 1
+          zip_decompression_error = 2
+          OTHERS                  = 3 ).
+    IF sy-subrc <> 0.
+      RAISE EXCEPTION NEW zcx_zip_diff( |zip->get { sy-subrc } { name }| ).
+    ENDIF.
+
+    SPLIT name AT '/' INTO TABLE DATA(parts).
+    DATA(new_parts) = VALUE string_table( ).
+    LOOP AT parts REFERENCE INTO DATA(part).
+      INSERT part->* INTO new_parts INDEX 1.
+    ENDLOOP.
+
+    result = |{ temp_dir }\\{ prefix }_{ concat_lines_of( table = new_parts sep = '_' ) }.xml|.
+    IF name CS '.xml'.
+      xml_pretty_print( CHANGING c_content = content ).
+    ENDIF.
+
+    gui_download( i_content   = content
+                  i_file_path = result ).
+
+  ENDMETHOD.
 
 ENDCLASS.
